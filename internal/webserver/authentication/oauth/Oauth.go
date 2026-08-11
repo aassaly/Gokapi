@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -61,7 +62,11 @@ func HandlerLogin(w http.ResponseWriter, r *http.Request) {
 
 func initLogin(w http.ResponseWriter, r *http.Request, screenType int) {
 	state := helper.GenerateRandomString(32)
+	nonce := helper.GenerateRandomString(32)
+	verifier := oauth2.GenerateVerifier()
 	setCallbackCookie(w, state)
+	setNamedCallbackCookie(w, authentication.CookieOauthNonce, nonce)
+	setNamedCallbackCookie(w, authentication.CookieOauthVerifier, verifier)
 	var prompt string
 	switch screenType {
 	case promptSilent:
@@ -73,7 +78,10 @@ func initLogin(w http.ResponseWriter, r *http.Request, screenType int) {
 	default:
 		panic("invalid screen type")
 	}
-	http.Redirect(w, r, config.AuthCodeURL(state)+"&prompt="+prompt, http.StatusFound)
+	http.Redirect(w, r, config.AuthCodeURL(state,
+		oauth2.S256ChallengeOption(verifier),
+		oauth2.SetAuthURLParam("nonce", nonce),
+		oauth2.SetAuthURLParam("prompt", prompt)), http.StatusFound)
 }
 
 func isConsentRequired(r *http.Request) bool {
@@ -87,12 +95,12 @@ func isLoginRequired(r *http.Request) bool {
 
 // HandlerCallback is a handler for processing the oauth callback
 func HandlerCallback(w http.ResponseWriter, r *http.Request) {
-	state, err := r.Cookie(authentication.CookieOauth)
+	state, err := readCallbackCookie(r, authentication.CookieOauth)
 	if err != nil {
 		errorHandling.RedirectToOAuthErrorPage(w, r, "Parameter state was not provided", err)
 		return
 	}
-	if r.URL.Query().Get("state") != state.Value {
+	if r.URL.Query().Get("state") != state {
 		errorHandling.RedirectToOAuthErrorPage(w, r, "Parameter state did not match", err)
 		return
 	}
@@ -105,10 +113,38 @@ func HandlerCallback(w http.ResponseWriter, r *http.Request) {
 		initLogin(w, r, promptSelectAccount)
 		return
 	}
+	nonce, err := readCallbackCookie(r, authentication.CookieOauthNonce)
+	if err != nil {
+		errorHandling.RedirectToOAuthErrorPage(w, r, "OIDC nonce was not provided", err)
+		return
+	}
+	verifier, err := readCallbackCookie(r, authentication.CookieOauthVerifier)
+	if err != nil {
+		errorHandling.RedirectToOAuthErrorPage(w, r, "PKCE verifier was not provided", err)
+		return
+	}
+	clearCallbackCookies(w)
 
-	oauth2Token, err := config.Exchange(ctx, r.URL.Query().Get("code"))
+	oauth2Token, err := config.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(verifier))
 	if err != nil {
 		errorHandling.RedirectToOAuthErrorPage(w, r, "Failed to exchange token", err)
+		return
+	}
+	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+	if !ok {
+		errorHandling.RedirectToOAuthErrorPage(w, r, "OIDC provider did not return an ID token", nil)
+		return
+	}
+	idToken, err := provider.Verifier(&oidc.Config{ClientID: config.ClientID}).Verify(ctx, rawIDToken)
+	if err != nil {
+		errorHandling.RedirectToOAuthErrorPage(w, r, "Failed to verify ID token", err)
+		return
+	}
+	var idClaims struct {
+		Nonce string `json:"nonce"`
+	}
+	if err := idToken.Claims(&idClaims); err != nil || idClaims.Nonce != nonce {
+		errorHandling.RedirectToOAuthErrorPage(w, r, "OIDC nonce did not match", err)
 		return
 	}
 
@@ -134,12 +170,32 @@ func HandlerCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func setCallbackCookie(w http.ResponseWriter, value string) {
+	setNamedCallbackCookie(w, authentication.CookieOauth, value)
+}
+
+func setNamedCallbackCookie(w http.ResponseWriter, name, value string) {
 	c := &http.Cookie{
-		Name:     authentication.CookieOauth,
+		Name:     name,
 		Value:    value,
-		MaxAge:   int(time.Hour.Seconds()),
+		Path:     "/oauth-callback",
+		MaxAge:   int((10 * time.Minute).Seconds()),
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, c)
+}
+
+func readCallbackCookie(r *http.Request, name string) (string, error) {
+	cookie, err := r.Cookie(name)
+	if err != nil || cookie.Value == "" {
+		return "", errors.New("OIDC callback cookie is missing")
+	}
+	return cookie.Value, nil
+}
+
+func clearCallbackCookies(w http.ResponseWriter) {
+	for _, name := range []string{authentication.CookieOauth, authentication.CookieOauthNonce, authentication.CookieOauthVerifier} {
+		http.SetCookie(w, &http.Cookie{Name: name, Path: "/oauth-callback", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+	}
 }

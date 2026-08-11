@@ -50,6 +50,31 @@ func (p *paramFilesListSingle) New() requestParser {
 	return &paramFilesListSingle{}
 }
 
+// ParseRequest reads r and saves the passed header values in the paramFilesShorten struct
+// In the end, ProcessParameter() is called
+func (p *paramFilesShorten) ParseRequest(r *http.Request) error {
+	var err error
+	var exists bool
+	p.foundHeaders = make(map[string]bool)
+
+	// RequestParser header value "id", required: true
+	exists, err = checkHeaderExists(r, "id", true, true)
+	if err != nil {
+		return err
+	}
+	p.foundHeaders["id"] = exists
+	if exists {
+		p.Id = r.Header.Get("id")
+	}
+
+	return p.ProcessParameter(r)
+}
+
+// New returns a new instance of paramFilesShorten struct
+func (p *paramFilesShorten) New() requestParser {
+	return &paramFilesShorten{}
+}
+
 // ParseRequest reads r and saves the passed header values in the paramFilesDownloadSingle struct
 // In the end, ProcessParameter() is called
 func (p *paramFilesDownloadSingle) ParseRequest(r *http.Request) error {

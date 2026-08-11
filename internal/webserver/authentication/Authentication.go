@@ -24,7 +24,13 @@ import (
 type userNameContext string
 
 // CookieOauth is the cookie name used for login
-const CookieOauth = "state"
+const CookieOauth = "gokapi-oidc-state"
+
+// CookieOauthNonce binds the returned ID token to the login attempt.
+const CookieOauthNonce = "gokapi-oidc-nonce"
+
+// CookieOauthVerifier holds the per-login PKCE verifier.
+const CookieOauthVerifier = "gokapi-oidc-pkce"
 
 const userNameContextKey userNameContext = "userName"
 

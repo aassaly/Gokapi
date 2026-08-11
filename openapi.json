@@ -378,6 +378,31 @@
         }
       }
     },
+    "/files/shorten": {
+      "post": {
+        "tags": ["files"],
+        "summary": "Creates or returns a Dub short link",
+        "description": "Creates an idempotent Dub short link for an owned file. Requires API permission VIEW. The Dub credential remains server-side.",
+        "operationId": "shorten",
+        "security": [{"apikey": ["VIEW"]}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "header",
+            "required": true,
+            "schema": {"type": "string"},
+            "description": "ID of the file to shorten"
+          }
+        ],
+        "responses": {
+          "200": {"description": "Short link created or returned"},
+          "400": {"description": "Invalid input"},
+          "401": {"description": "Invalid API key or insufficient permission"},
+          "404": {"description": "File not found"},
+          "503": {"description": "Dub integration unavailable"}
+        }
+      }
+    },
     "/chunk/add": {
       "post": {
         "tags": [

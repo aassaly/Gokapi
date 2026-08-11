@@ -254,6 +254,31 @@ async function apiChunkComplete(uuid, filename, filesize, realsize, contenttype,
 
 // /files
 
+async function apiFilesShorten(id) {
+    const apiUrl = './api/files/shorten';
+    const reqPerm = 'PERM_VIEW';
+    const token = await getToken(reqPerm, false);
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': token,
+            'id': id
+        }
+    });
+    if (!response.ok) {
+        let message = `Request failed with status: ${response.status}`;
+        try {
+            const errorResponse = await response.json();
+            message = errorResponse.ErrorMessage || message;
+        } catch (_) {
+            // Keep the status-only message when the response is not JSON.
+        }
+        throw new Error(message);
+    }
+    return response.json();
+}
+
 
 async function apiFilesReplace(id, newId) {
     const apiUrl = './api/files/replace';

@@ -855,6 +855,28 @@ function createButtonGroup(item) {
     }
     liDr1.appendChild(aDr1);
     dropdown1.appendChild(liDr1);
+
+    const liShort = document.createElement("li");
+    const shortLink = document.createElement("a");
+    shortLink.className = "dropdown-item";
+    shortLink.href = "#";
+    shortLink.innerHTML = `<i class="bi bi-link-45deg"></i> Copy short URL`;
+    shortLink.addEventListener("click", async (event) => {
+        event.preventDefault();
+        shortLink.classList.add("disabled");
+        try {
+            const result = await apiFilesShorten(item.Id);
+            await navigator.clipboard.writeText(result.shortLink);
+            showToast(1000);
+        } catch (error) {
+            console.error("Unable to create short URL:", error);
+            alert("Unable to create short URL. The original Gokapi URL remains available.");
+        } finally {
+            shortLink.classList.remove("disabled");
+        }
+    });
+    liShort.appendChild(shortLink);
+    dropdown1.appendChild(liShort);
     group1.appendChild(dropdown1);
 
     // Share button

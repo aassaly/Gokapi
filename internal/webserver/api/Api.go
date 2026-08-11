@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/forceu/gokapi/internal/configuration/database"
 	"github.com/forceu/gokapi/internal/encryption"
 	"github.com/forceu/gokapi/internal/helper"
+	"github.com/forceu/gokapi/internal/integration/dub"
 	"github.com/forceu/gokapi/internal/logging"
 	"github.com/forceu/gokapi/internal/logging/serverstats"
 	"github.com/forceu/gokapi/internal/models"
@@ -823,6 +825,41 @@ func outputFileApiInfo(w http.ResponseWriter, file models.File) {
 	result, err := json.Marshal(publicOutput)
 	helper.Check(err)
 	_, _ = w.Write(result)
+}
+
+func apiShortenFile(w http.ResponseWriter, r requestParser, user models.User, _ models.ApiKey) {
+	request, ok := r.(*paramFilesShorten)
+	if !ok {
+		panic("invalid parameter passed")
+	}
+	file, ok := database.GetMetaDataById(request.Id)
+	if !ok || file.IsFileRequest() {
+		sendError(w, http.StatusNotFound, errorcodes.NotFound, "Invalid file ID provided.")
+		return
+	}
+	if file.UserId != user.Id && !user.HasPermission(models.UserPermListOtherUploads) {
+		sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "No permission to view file.")
+		return
+	}
+	config, err := dub.LoadConfig()
+	if err != nil {
+		sendError(w, http.StatusServiceUnavailable, errorcodes.UnspecifiedError, "URL shortening is unavailable.")
+		return
+	}
+	publicFile, err := file.ToFileApiOutput(configuration.Get().ServerUrl, configuration.Get().IncludeFilename)
+	if err != nil {
+		sendError(w, http.StatusInternalServerError, errorcodes.UnspecifiedError, "Unable to prepare file URL.")
+		return
+	}
+	link, err := dub.Upsert(request.Request.Context(), config, publicFile.UrlDownload, file.Id, file.Name, file.ExpireAt, file.UnlimitedTime)
+	if err != nil {
+		log.Printf("Unable to create Dub short link for file %s: %v", file.Id, err)
+		sendError(w, http.StatusBadGateway, errorcodes.UnspecifiedError, "URL shortening failed; the original URL remains available.")
+		return
+	}
+	response, err := json.Marshal(link)
+	helper.Check(err)
+	_, _ = w.Write(response)
 }
 
 func outputFileJson(w http.ResponseWriter, file models.File) {

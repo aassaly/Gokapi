@@ -81,6 +81,12 @@ var routes = []apiRoute{
 		RequestParser: &paramFilesListSingle{},
 	},
 	{
+		Url:           "/files/shorten",
+		ApiPerm:       models.ApiPermView,
+		execution:     apiShortenFile,
+		RequestParser: &paramFilesShorten{},
+	},
+	{
 		Url:           "/chunk/add",
 		ApiPerm:       models.ApiPermUpload,
 		execution:     apiChunkAdd,
@@ -317,6 +323,17 @@ func (p *paramFilesListAll) ProcessParameter(_ *http.Request) error {
 
 type paramFilesListSingle struct {
 	Id string
+}
+
+type paramFilesShorten struct {
+	Id           string `header:"id" required:"true"`
+	Request      *http.Request
+	foundHeaders map[string]bool
+}
+
+func (p *paramFilesShorten) ProcessParameter(request *http.Request) error {
+	p.Request = request
+	return nil
 }
 
 func (p *paramFilesListSingle) ProcessParameter(r *http.Request) error {
