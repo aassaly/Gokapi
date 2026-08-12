@@ -865,14 +865,7 @@ function createButtonGroup(item) {
         event.preventDefault();
         shortLink.classList.add("disabled");
         try {
-            let password = '';
-            if (item.IsPasswordProtected === true) {
-                password = window.prompt('Enter the existing Gokapi file password. The same password will protect its Dub short URL:') ?? '';
-                if (password === '') {
-                    return;
-                }
-            }
-            const result = await apiFilesShorten(item.Id, password);
+            const result = await apiFilesShorten(item.Id);
             await navigator.clipboard.writeText(result.shortLink);
             showToast(1000);
         } catch (error) {

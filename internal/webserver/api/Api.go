@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -129,6 +130,9 @@ func apiEditFile(w http.ResponseWriter, r requestParser, user models.User, _ mod
 
 	database.SaveMetaData(file)
 	logging.LogEdit(file, user)
+	if !request.KeepPassword {
+		syncDubLink(context.Background(), file, request.Password)
+	}
 	outputFileApiInfo(w, file)
 }
 
@@ -515,7 +519,23 @@ func doBlockingPartCompleteChunk(w http.ResponseWriter, uuid string, fileHeader 
 	}
 	fr, _ := filerequest.Get(uploadParameters.FileRequestId)
 	logging.LogUpload(file, user, fr)
+	if uploadParameters.FileRequestId == "" {
+		syncDubLink(context.Background(), file, uploadParameters.Password)
+	}
 	outputFileJson(w, file)
+}
+
+// syncDubLink is best effort: Dub availability must never block an upload or
+// password edit. Plaintext exists only for this call and is never persisted.
+func syncDubLink(ctx context.Context, file models.File, password string) {
+	config, err := dub.LoadConfig()
+	if err != nil {
+		log.Printf("Unable to synchronize Dub short link for file %s: %v", file.Id, err)
+		return
+	}
+	if _, err := dub.Upsert(ctx, config, file.Id, file.Name, password, file.ExpireAt, file.UnlimitedTime); err != nil {
+		log.Printf("Unable to synchronize Dub short link for file %s: %v", file.Id, err)
+	}
 }
 
 func apiChunkUploadRequestComplete(w http.ResponseWriter, r requestParser, user models.User, apikey models.ApiKey) {
@@ -841,25 +861,23 @@ func apiShortenFile(w http.ResponseWriter, r requestParser, user models.User, _ 
 		sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "No permission to view file.")
 		return
 	}
-	if file.PasswordHash != "" {
-		valid, _ := configuration.VerifyPassword(request.Password, file.PasswordHash, configuration.Get().Authentication.SaltFiles)
-		if !valid {
-			sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "The existing Gokapi file password is incorrect.")
-			return
-		}
-	} else if request.Password != "" {
-		sendError(w, http.StatusBadRequest, errorcodes.InvalidUserInput, "A password cannot be added only to the short URL.")
-		return
-	}
 	config, err := dub.LoadConfig()
 	if err != nil {
 		sendError(w, http.StatusServiceUnavailable, errorcodes.UnspecifiedError, "URL shortening is unavailable.")
 		return
 	}
-	link, err := dub.Upsert(request.Request.Context(), config, file.Id, file.Name, request.Password, file.ExpireAt, file.UnlimitedTime)
+	link, err := dub.Get(request.Request.Context(), config, file.Id)
 	if err != nil {
-		log.Printf("Unable to create Dub short link for file %s: %v", file.Id, err)
-		sendError(w, http.StatusBadGateway, errorcodes.UnspecifiedError, "URL shortening failed; the original URL remains available.")
+		log.Printf("Unable to retrieve Dub short link for file %s: %v", file.Id, err)
+		if file.PasswordHash != "" {
+			sendError(w, http.StatusConflict, errorcodes.InvalidUserInput, "This existing protected file must have its password saved once before its short URL is available.")
+			return
+		}
+		link, err = dub.Upsert(request.Request.Context(), config, file.Id, file.Name, "", file.ExpireAt, file.UnlimitedTime)
+		if err != nil {
+			sendError(w, http.StatusBadGateway, errorcodes.UnspecifiedError, "URL shortening failed; the original URL remains available.")
+			return
+		}
 		return
 	}
 	response, err := json.Marshal(link)

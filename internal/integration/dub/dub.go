@@ -31,6 +31,37 @@ type Link struct {
 	ShortLink string `json:"shortLink"`
 }
 
+// Get returns the existing Gokapi-managed link without changing its password.
+func Get(ctx context.Context, config Config, fileID string) (Link, error) {
+	requestURL := config.APIURL + "/links/info?externalId=" + url.QueryEscape(config.URLPrefix+fileID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return Link{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+config.Token)
+	req.Header.Set("Accept", "application/json")
+	response, err := httpClient.Do(req)
+	if err != nil {
+		return Link{}, fmt.Errorf("call Dub API: %w", err)
+	}
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	if err != nil {
+		return Link{}, fmt.Errorf("read Dub API response: %w", err)
+	}
+	if len(responseBody) > maxResponseBytes {
+		return Link{}, errors.New("Dub API response exceeded the size limit")
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return Link{}, fmt.Errorf("Dub API returned HTTP %d", response.StatusCode)
+	}
+	var link Link
+	if err := json.Unmarshal(responseBody, &link); err != nil {
+		return Link{}, fmt.Errorf("decode Dub API response: %w", err)
+	}
+	return validateLink(config, link)
+}
+
 type upsertRequest struct {
 	URL             string `json:"url"`
 	Domain          string `json:"domain"`
@@ -121,6 +152,10 @@ func Upsert(ctx context.Context, config Config, fileID, title, password string, 
 	if err := json.Unmarshal(responseBody, &link); err != nil {
 		return Link{}, fmt.Errorf("decode Dub API response: %w", err)
 	}
+	return validateLink(config, link)
+}
+
+func validateLink(config Config, link Link) (Link, error) {
 	shortURL, err := url.Parse(link.ShortLink)
 	if err != nil || shortURL.Scheme != "https" || !strings.EqualFold(shortURL.Hostname(), config.Domain) {
 		return Link{}, errors.New("Dub API returned an invalid short link")
