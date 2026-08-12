@@ -865,7 +865,14 @@ function createButtonGroup(item) {
         event.preventDefault();
         shortLink.classList.add("disabled");
         try {
-            const result = await apiFilesShorten(item.Id);
+            let password = '';
+            if (item.IsPasswordProtected === true) {
+                password = window.prompt('Enter the file password to protect its Dub short URL:') ?? '';
+                if (password === '') {
+                    return;
+                }
+            }
+            const result = await apiFilesShorten(item.Id, password);
             await navigator.clipboard.writeText(result.shortLink);
             showToast(1000);
         } catch (error) {
