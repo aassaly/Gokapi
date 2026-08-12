@@ -2,6 +2,7 @@ package dub
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -21,6 +22,13 @@ func TestUpsert(t *testing.T) {
 		}
 		if request.Header.Get("Authorization") != "Bearer secret" {
 			t.Fatal("missing bearer token")
+		}
+		var body upsertRequest
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if !body.TrackConversion {
+			t.Fatal("conversion tracking must be enabled for Gokapi links")
 		}
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"shortLink":"https://go.example/abc"}`))}, nil
 	})}
