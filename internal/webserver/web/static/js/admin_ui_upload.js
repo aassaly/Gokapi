@@ -867,7 +867,7 @@ function createButtonGroup(item) {
         try {
             let password = '';
             if (item.IsPasswordProtected === true) {
-                password = window.prompt('Enter the file password to protect its Dub short URL:') ?? '';
+                password = window.prompt('Enter the existing Gokapi file password. The same password will protect its Dub short URL:') ?? '';
                 if (password === '') {
                     return;
                 }
@@ -877,7 +877,10 @@ function createButtonGroup(item) {
             showToast(1000);
         } catch (error) {
             console.error("Unable to create short URL:", error);
-            alert("Unable to create short URL. The original Gokapi URL remains available.");
+            const detail = error instanceof Error && error.message
+                ? ` ${error.message}`
+                : '';
+            alert(`Unable to create short URL.${detail} The original Gokapi URL remains available.`);
         } finally {
             shortLink.classList.remove("disabled");
         }
