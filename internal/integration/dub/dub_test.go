@@ -61,3 +61,24 @@ func TestUpsertRejectsWrongDomain(t *testing.T) {
 		t.Fatal("expected domain validation error")
 	}
 }
+
+func TestGetDoesNotMutatePassword(t *testing.T) {
+	original := httpClient
+	t.Cleanup(func() { httpClient = original })
+	httpClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.Method != http.MethodGet || request.URL.String() != "https://dub.example/api/links/info?externalId=test%3Aabc" {
+			t.Fatalf("unexpected request: %s %s", request.Method, request.URL)
+		}
+		if request.Body != nil {
+			t.Fatal("link lookup must not send a request body")
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"shortLink":"https://go.example/g/abc"}`))}, nil
+	})}
+	link, err := Get(context.Background(), Config{APIURL: "https://dub.example/api", Token: "secret", Domain: "go.example", URLPrefix: "test:"}, "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link.ShortLink != "https://go.example/g/abc" {
+		t.Fatalf("unexpected short link: %s", link.ShortLink)
+	}
+}

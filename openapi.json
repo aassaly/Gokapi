@@ -392,19 +392,13 @@
             "required": true,
             "schema": {"type": "string"},
             "description": "ID of the file to shorten"
-          },
-          {
-            "name": "password",
-            "in": "header",
-            "required": false,
-            "schema": {"type": "string", "format": "password"},
-            "description": "Existing Gokapi file password. Required for password-protected files and applied to the Dub link. Prefix with base64: to encode the value."
           }
         ],
         "responses": {
           "200": {"description": "Short link created or returned"},
           "400": {"description": "Invalid input"},
-          "401": {"description": "Invalid API key, insufficient permission, or incorrect file password"},
+          "401": {"description": "Invalid API key or insufficient permission"},
+          "409": {"description": "An existing protected file requires one password migration"},
           "404": {"description": "File not found"},
           "503": {"description": "Dub integration unavailable"}
         }

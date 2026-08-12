@@ -67,23 +67,6 @@ func (p *paramFilesShorten) ParseRequest(r *http.Request) error {
 		p.Id = r.Header.Get("id")
 	}
 
-	// RequestParser header value "password", required: false, has base64support
-	exists, err = checkHeaderExists(r, "password", false, true)
-	if err != nil {
-		return err
-	}
-	p.foundHeaders["password"] = exists
-	if exists {
-		p.Password = r.Header.Get("password")
-		if strings.HasPrefix(p.Password, "base64:") {
-			decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(p.Password, "base64:"))
-			if err != nil {
-				return err
-			}
-			p.Password = string(decoded)
-		}
-	}
-
 	return p.ProcessParameter(r)
 }
 

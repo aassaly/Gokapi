@@ -254,7 +254,7 @@ async function apiChunkComplete(uuid, filename, filesize, realsize, contenttype,
 
 // /files
 
-async function apiFilesShorten(id, password = '') {
+async function apiFilesShorten(id) {
     const apiUrl = './api/files/shorten';
     const reqPerm = 'PERM_VIEW';
     const token = await getToken(reqPerm, false);
@@ -263,8 +263,7 @@ async function apiFilesShorten(id, password = '') {
         headers: {
             'Content-Type': 'application/json',
             'apikey': token,
-            'id': id,
-            'password': 'base64:' + Base64.encode(password)
+            'id': id
         }
     });
     if (!response.ok) {
