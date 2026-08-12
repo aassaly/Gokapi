@@ -521,10 +521,12 @@ function TestAWS(button, isManual) {
 		    apikey: document.getElementById("s3_api").value,
 		    apisecret: document.getElementById("s3_secret").value,
 		    endpoint: document.getElementById("s3_endpoint").value,
+		    exturl: document.getElementById("url").value,
 		    isEnvProvided: false
 		}));
 	} else {
 		xhr.send(JSON.stringify({
+		    exturl: document.getElementById("url").value,
 		    isEnvProvided: true
 		}));
 	}
