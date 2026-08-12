@@ -844,7 +844,7 @@ func apiShortenFile(w http.ResponseWriter, r requestParser, user models.User, _ 
 	if file.PasswordHash != "" {
 		valid, _ := configuration.VerifyPassword(request.Password, file.PasswordHash, configuration.Get().Authentication.SaltFiles)
 		if !valid {
-			sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "The file password is required to create its short URL.")
+			sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "The existing Gokapi file password is incorrect.")
 			return
 		}
 	} else if request.Password != "" {
