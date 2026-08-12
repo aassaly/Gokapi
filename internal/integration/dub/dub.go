@@ -30,12 +30,13 @@ type Link struct {
 }
 
 type upsertRequest struct {
-	URL        string `json:"url"`
-	Domain     string `json:"domain"`
-	ExternalID string `json:"externalId"`
-	Title      string `json:"title,omitempty"`
-	ExpiresAt  string `json:"expiresAt,omitempty"`
-	DoIndex    bool   `json:"doIndex"`
+	URL             string `json:"url"`
+	Domain          string `json:"domain"`
+	ExternalID      string `json:"externalId"`
+	Title           string `json:"title,omitempty"`
+	ExpiresAt       string `json:"expiresAt,omitempty"`
+	DoIndex         bool   `json:"doIndex"`
+	TrackConversion bool   `json:"trackConversion"`
 }
 
 func LoadConfig() (Config, error) {
@@ -72,11 +73,12 @@ func LoadConfig() (Config, error) {
 
 func Upsert(ctx context.Context, config Config, destination, fileID, title string, expiresAt int64, unlimitedTime bool) (Link, error) {
 	requestBody := upsertRequest{
-		URL:        destination,
-		Domain:     config.Domain,
-		ExternalID: config.URLPrefix + fileID,
-		Title:      title,
-		DoIndex:    false,
+		URL:             destination,
+		Domain:          config.Domain,
+		ExternalID:      config.URLPrefix + fileID,
+		Title:           title,
+		DoIndex:         false,
+		TrackConversion: true,
 	}
 	if !unlimitedTime && expiresAt > 0 {
 		requestBody.ExpiresAt = time.Unix(expiresAt, 0).UTC().Format(time.RFC3339)
