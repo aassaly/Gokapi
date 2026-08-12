@@ -841,17 +841,22 @@ func apiShortenFile(w http.ResponseWriter, r requestParser, user models.User, _ 
 		sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "No permission to view file.")
 		return
 	}
+	if file.PasswordHash != "" {
+		valid, _ := configuration.VerifyPassword(request.Password, file.PasswordHash, configuration.Get().Authentication.SaltFiles)
+		if !valid {
+			sendError(w, http.StatusUnauthorized, errorcodes.NoPermission, "The file password is required to create its short URL.")
+			return
+		}
+	} else if request.Password != "" {
+		sendError(w, http.StatusBadRequest, errorcodes.InvalidUserInput, "A password cannot be added only to the short URL.")
+		return
+	}
 	config, err := dub.LoadConfig()
 	if err != nil {
 		sendError(w, http.StatusServiceUnavailable, errorcodes.UnspecifiedError, "URL shortening is unavailable.")
 		return
 	}
-	publicFile, err := file.ToFileApiOutput(configuration.Get().ServerUrl, configuration.Get().IncludeFilename)
-	if err != nil {
-		sendError(w, http.StatusInternalServerError, errorcodes.UnspecifiedError, "Unable to prepare file URL.")
-		return
-	}
-	link, err := dub.Upsert(request.Request.Context(), config, publicFile.UrlDownload, file.Id, file.Name, file.ExpireAt, file.UnlimitedTime)
+	link, err := dub.Upsert(request.Request.Context(), config, file.Id, file.Name, request.Password, file.ExpireAt, file.UnlimitedTime)
 	if err != nil {
 		log.Printf("Unable to create Dub short link for file %s: %v", file.Id, err)
 		sendError(w, http.StatusBadGateway, errorcodes.UnspecifiedError, "URL shortening failed; the original URL remains available.")

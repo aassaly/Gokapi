@@ -327,6 +327,7 @@ type paramFilesListSingle struct {
 
 type paramFilesShorten struct {
 	Id           string `header:"id" required:"true"`
+	Password     string `header:"password" supportBase64:"true"`
 	Request      *http.Request
 	foundHeaders map[string]bool
 }

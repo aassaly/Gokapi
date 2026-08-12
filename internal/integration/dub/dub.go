@@ -3,6 +3,8 @@ package dub
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +34,9 @@ type Link struct {
 type upsertRequest struct {
 	URL             string `json:"url"`
 	Domain          string `json:"domain"`
+	Key             string `json:"key"`
 	ExternalID      string `json:"externalId"`
+	Password        string `json:"password,omitempty"`
 	Title           string `json:"title,omitempty"`
 	ExpiresAt       string `json:"expiresAt,omitempty"`
 	DoIndex         bool   `json:"doIndex"`
@@ -71,11 +75,15 @@ func LoadConfig() (Config, error) {
 	return Config{APIURL: apiURL, Token: token, Domain: domain, URLPrefix: urlPrefix}, nil
 }
 
-func Upsert(ctx context.Context, config Config, destination, fileID, title string, expiresAt int64, unlimitedTime bool) (Link, error) {
+func Upsert(ctx context.Context, config Config, fileID, title, password string, expiresAt int64, unlimitedTime bool) (Link, error) {
+	key := brokerKey(fileID)
+	destination := "https://" + config.Domain + "/" + key + "/_download/" + url.PathEscape(fileID)
 	requestBody := upsertRequest{
 		URL:             destination,
 		Domain:          config.Domain,
+		Key:             key,
 		ExternalID:      config.URLPrefix + fileID,
+		Password:        password,
 		Title:           title,
 		DoIndex:         false,
 		TrackConversion: true,
@@ -118,4 +126,9 @@ func Upsert(ctx context.Context, config Config, destination, fileID, title strin
 		return Link{}, errors.New("Dub API returned an invalid short link")
 	}
 	return link, nil
+}
+
+func brokerKey(fileID string) string {
+	sum := sha256.Sum256([]byte(fileID))
+	return "g/" + base64.RawURLEncoding.EncodeToString(sum[:9])
 }

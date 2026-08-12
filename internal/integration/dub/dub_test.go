@@ -30,9 +30,18 @@ func TestUpsert(t *testing.T) {
 		if !body.TrackConversion {
 			t.Fatal("conversion tracking must be enabled for Gokapi links")
 		}
+		if body.Key != "g/ungWv48Bz-pB" {
+			t.Fatalf("unexpected stable broker key: %s", body.Key)
+		}
+		if body.URL != "https://go.example/g/ungWv48Bz-pB/_download/abc" {
+			t.Fatalf("unexpected broker destination: %s", body.URL)
+		}
+		if body.Password != "file-password" {
+			t.Fatal("file password was not applied to the Dub link")
+		}
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"shortLink":"https://go.example/abc"}`))}, nil
 	})}
-	link, err := Upsert(context.Background(), Config{APIURL: "https://dub.example/api", Token: "secret", Domain: "go.example", URLPrefix: "test:"}, "https://files.example/d?id=abc", "abc", "file.txt", 0, true)
+	link, err := Upsert(context.Background(), Config{APIURL: "https://dub.example/api", Token: "secret", Domain: "go.example", URLPrefix: "test:"}, "abc", "file.txt", "file-password", 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +56,7 @@ func TestUpsertRejectsWrongDomain(t *testing.T) {
 	httpClient = &http.Client{Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"shortLink":"https://evil.example/abc"}`))}, nil
 	})}
-	_, err := Upsert(context.Background(), Config{APIURL: "https://dub.example/api", Token: "secret", Domain: "go.example"}, "https://files.example/d?id=abc", "abc", "file.txt", 0, true)
+	_, err := Upsert(context.Background(), Config{APIURL: "https://dub.example/api", Token: "secret", Domain: "go.example"}, "abc", "file.txt", "", 0, true)
 	if err == nil {
 		t.Fatal("expected domain validation error")
 	}
